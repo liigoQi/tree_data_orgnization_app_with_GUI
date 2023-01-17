@@ -4,6 +4,7 @@ import sqlite3
 class MainFrame(wx.Frame):
     def __init__(self, parent, title):
         super().__init__(parent, title=title)
+        self.SetSize((500, 300))
         #self.textCtrls = [] # 树信息列表
         #self.itemData = []  # 被选中项目的值
         self.colNames = ['编号', '姓名', '手机号', '上级编号', '个人业绩']
@@ -67,12 +68,24 @@ class MainFrame(wx.Frame):
         self.tree.Expand(rootItem)
 
     def initDetailView(self):
-        fgs = wx.GridBagSizer(11, 2)
-        self.box.Add(fgs, wx.EXPAND | wx.ALL, border=10)
+        rightBox = wx.BoxSizer(wx.VERTICAL)
+        gbs = wx.GridBagSizer(5, 2)
+        btnBox = wx.BoxSizer(wx.HORIZONTAL)
+        rightBox.Add(gbs, flag=wx.ALL, border=5)
+        rightBox.Add(btnBox, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL, border=15)
+        self.box.Add(rightBox, flag=wx.EXPAND | wx.ALL, border=10)
+        
         for i, name in enumerate(self.colNames):
-            fgs.Add(wx.StaticText(self.panel, label=name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
+            gbs.Add(wx.StaticText(self.panel, label=name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
             # 不开启编辑，均为只读
-            fgs.Add(wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY), (i, 1))
+            gbs.Add(wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY), (i, 1), flag=wx.LEFT, border=8)        
+        gbs.Add(wx.StaticText(self.panel, label='总个人业绩'), (5, 0))
+        #gbs.Add(wx.StaticText(self.panel, label=str(self.getTotalValue())))
+        
+        #btnBox.Add(wx.StaticText(self.panel, label=''))
+        btnBox.Add(wx.Button(self.panel, wx.ID_EDIT, '编辑', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
+        btnBox.Add(wx.Button(self.panel, wx.ID_SAVE, '保存', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
+        #btnBox.Add(wx.StaticText(self.panel, label=''))
 
 def main():
     app = wx.App()
