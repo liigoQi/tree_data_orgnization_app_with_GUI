@@ -15,6 +15,7 @@ class MainFrame(wx.Frame):
 
         self.readTreeData()
         self.initTreeView()
+        self.updateTreeLabel()  # 创建好树后将label更新为 姓名（个人业绩/个人总业绩）
         self.initDetailView()
 
         self.infoBox = wx.BoxSizer(wx.VERTICAL)
@@ -38,7 +39,16 @@ class MainFrame(wx.Frame):
     
     def getItemTotalValue(self, treeItem):
         treeData = self.tree.GetItemData(treeItem)
-        return 1
+        selfValue = treeData[-1]
+        totalValue = selfValue
+        if self.tree.ItemHasChildren(treeItem):
+            childItem, cookie = self.tree.GetFirstChild(treeItem)
+            while childItem.IsOk():
+                totalValue += self.getItemTotalValue(childItem)
+                childItem, cookie = self.tree.GetNextChild(treeItem, cookie)
+            return totalValue
+        else:
+            return totalValue
 
     def treeRightClick(self, e):
         pass 
@@ -79,6 +89,24 @@ class MainFrame(wx.Frame):
         self.box.Add(leftBox, 1, wx.EXPAND | wx.ALL, border=10)
         self.tree.Expand(rootItem)
 
+    def updateTreeLabel(self):
+        rootItem = self.tree.GetRootItem()
+        if self.tree.ItemHasChildren(rootItem):
+            
+
+        treeData = self.tree.GetItemData(treeItem)
+        selfValue = treeData[-1]
+        totalValue = selfValue
+        if self.tree.ItemHasChildren(treeItem):
+            childItem, cookie = self.tree.GetFirstChild(treeItem)
+            while childItem.IsOk():
+                totalValue += self.getItemTotalValue(childItem)
+                childItem, cookie = self.tree.GetNextChild(treeItem, cookie)
+            return totalValue
+        else:
+            return totalValue
+
+
     def initDetailView(self):
         rightBox = wx.BoxSizer(wx.VERTICAL)
         gbs = wx.GridBagSizer(5, 2)
@@ -92,10 +120,10 @@ class MainFrame(wx.Frame):
             # 不开启编辑，均为只读
             tc = wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY)
             self.textCtrls.append(tc)
-            gbs.Add(tc, (i, 1), flag=wx.LEFT, border=8)   
+            gbs.Add(tc, (i, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)   
         
         # 总个人业绩永远为只读     
-        gbs.Add(wx.StaticText(self.panel, label='总个人业绩'), (5, 0))
+        gbs.Add(wx.StaticText(self.panel, label='总个人业绩（自动计算）'), (5, 0))
         tc = wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY)
         self.textCtrls.append(tc)
         gbs.Add(tc, (5, 1), flag=wx.LEFT, border=8)
