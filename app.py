@@ -1,28 +1,45 @@
 import wx 
 import sqlite3
 
+class OurPopupMenu(wx.Menu):
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.Append(wx.MenuItem(self, wx.ID_NEW, '增加同级'))
+        self.Append(wx.MenuItem(self, wx.ID_ADD, '增加下级'))
+        self.Append(wx.MenuItem(self, wx.ID_DELETE, '删除此项'))
+
+
 class MainFrame(wx.Frame):
     def __init__(self, parent, title):
         super().__init__(parent, title=title)
-        self.SetSize((500, 300))
+        self.SetSize((700, 300))
         self.textCtrls = [] # 右侧信息列表
         #self.itemData = []  # 被选中项目的值
         self.colNames = ['编号', '姓名', '手机号', '上级编号', '个人业绩']
         
         self.panel = wx.Panel(self)
         self.box = wx.BoxSizer(wx.HORIZONTAL)
-        self.panel.SetSizer(self.box)
+        self.functionBox = wx.BoxSizer(wx.HORIZONTAL)
+        self.totalBox = wx.BoxSizer(wx.VERTICAL)
+        self.totalBox.Add(self.box, flag=wx.EXPAND)
+        self.totalBox.Add(self.functionBox)
+        self.panel.SetSizer(self.totalBox)
+
+        self.popupMenu = OurPopupMenu()
 
         self.readTreeData()
         self.initTreeView()
         self.updateTreeLabel()  # 创建好树后将label更新为 姓名（个人业绩/个人总业绩）
         self.initDetailView()
+        self.initFunctionView()
 
         self.infoBox = wx.BoxSizer(wx.VERTICAL)
 
         self.Bind(wx.EVT_TREE_SEL_CHANGED, self.treeSelChanged, self.tree)
         self.Bind(wx.EVT_TREE_ITEM_RIGHT_CLICK, self.treeRightClick, self.tree)
         self.Bind(wx.EVT_BUTTON, self.btnHandler)
+        # TODO:
+        #self.Bind(wx.EVT_MENU, self.menuHandler, self.popupMenu)
 
         self.Centre()
     
@@ -30,7 +47,7 @@ class MainFrame(wx.Frame):
         treeItem = e.GetItem() 
         treeData = self.tree.GetItemData(treeItem)
 
-        if not treeData:    # 点击root时treeData为0
+        if not self.tree.GetItemParent(treeItem).IsOk():    
             return 
         else:
             for i in range(len(treeData) - 1):
@@ -51,12 +68,26 @@ class MainFrame(wx.Frame):
             return totalValue
 
     def treeRightClick(self, e):
-        pass 
+        item = e.GetItem()
+        itemData = self.tree.GetItemData(item)
+        self.tree.SelectItem(item)
+        self.panel.PopupMenu(self.popupMenu)
 
     def btnHandler(self, e):
         pass 
 
-    
+    def menuHandler(self, e):
+        # handler不能传参数，要知道处理的是哪个item必须记录在class的属性里！ TODO:
+        # 这些修改都应该是直接对数据库做的，修改后再更新treeView即可
+        eid = e.GetId()
+        if eid == wx.ID_DELETE:
+            self.DeleteItem() 
+        else:
+            pass 
+
+    def DeleteItem():
+        pass 
+
     def readTreeData(self):
         treeData = [
             (0, '所有数据', None, None, None),
@@ -70,6 +101,7 @@ class MainFrame(wx.Frame):
 
     def initTreeView(self):
         self.tree = wx.TreeCtrl(self.panel)
+        #self.tree.SetQuickBestSize(False)
         rootItem = self.tree.AddRoot('所有数据', data=self.treeData[0])
 
         def makeTree(parent):
@@ -80,32 +112,42 @@ class MainFrame(wx.Frame):
                 for data in childrenData:
                     childItem = self.tree.AppendItem(parent, data[1], data=data)
                     makeTree(childItem)
+                    #self.tree.Expand(childItem)
             else:
                 return 
             
         makeTree(rootItem)
         leftBox = wx.BoxSizer()
-        leftBox.Add(self.tree, 1, wx.EXPAND)
+        leftBox.Add(self.tree, 1, wx.EXPAND | wx.ALL, border=5)
         self.box.Add(leftBox, 1, wx.EXPAND | wx.ALL, border=10)
-        self.tree.Expand(rootItem)
+        self.tree.ExpandAllChildren(rootItem)
 
-    def updateTreeLabel(self):
+    def updateTreeLabel(self):  # 更新
+
+        def updateSubtreeLabel(item):  # 更新一个节点和其子树的标签
+            itemData = self.tree.GetItemData(item)
+            name, value = itemData[1], itemData[-1]
+            totalValue = self.getItemTotalValue(item)
+            self.tree.SetItemText(item, f'{name}（{value}/{totalValue}）')
+            if self.tree.ItemHasChildren(item):
+                childItem, cookie = self.tree.GetFirstChild(item)
+                while childItem.IsOk():
+                    updateSubtreeLabel(childItem)
+                    childItem, cookie = self.tree.GetNextChild(childItem, cookie)
+            else:
+                return 
+
         rootItem = self.tree.GetRootItem()
+
         if self.tree.ItemHasChildren(rootItem):
-            
-
-        treeData = self.tree.GetItemData(treeItem)
-        selfValue = treeData[-1]
-        totalValue = selfValue
-        if self.tree.ItemHasChildren(treeItem):
-            childItem, cookie = self.tree.GetFirstChild(treeItem)
+            childItem, cookie = self.tree.GetFirstChild(rootItem)
             while childItem.IsOk():
-                totalValue += self.getItemTotalValue(childItem)
-                childItem, cookie = self.tree.GetNextChild(treeItem, cookie)
-            return totalValue
-        else:
-            return totalValue
-
+                updateSubtreeLabel(childItem)
+                childItem, cookie = self.tree.GetNextChild(childItem, cookie)
+    
+    def updateTreeView(self):
+        self.initTreeView()
+        self.updateTreeLabel()
 
     def initDetailView(self):
         rightBox = wx.BoxSizer(wx.VERTICAL)
@@ -130,6 +172,10 @@ class MainFrame(wx.Frame):
         
         btnBox.Add(wx.Button(self.panel, wx.ID_EDIT, '编辑', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
         btnBox.Add(wx.Button(self.panel, wx.ID_SAVE, '保存', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
+
+    def initFunctionView(self):
+        pass
+
 
 def main():
     app = wx.App()
