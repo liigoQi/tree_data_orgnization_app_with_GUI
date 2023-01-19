@@ -121,6 +121,7 @@ class MainFrame(wx.Frame):
 
     def readTreeData(self):
         self.treeData = self.db.getData(self.table)
+        #print(self.treeData)
 
     def initTreeView(self):
         self.tree = wx.TreeCtrl(self.panel)
@@ -130,7 +131,7 @@ class MainFrame(wx.Frame):
         def makeTree(parent):
             parentItemData = self.tree.GetItemData(parent)
             parentId = parentItemData[0]
-            childrenData = [_ for _ in self.treeData if _[3] == parentId]
+            childrenData = [_ for _ in self.treeData if _[2] == parentId]
             if childrenData:
                 for data in childrenData:
                     childItem = self.tree.AppendItem(parent, data[1], data=data)
@@ -167,6 +168,9 @@ class MainFrame(wx.Frame):
             while childItem.IsOk():
                 updateSubtreeLabel(childItem)
                 childItem, cookie = self.tree.GetNextChild(childItem, cookie)
+
+    def updateTreeData(self):
+        pass 
     
     def updateTreeView(self):
         self.initTreeView()
