@@ -60,9 +60,14 @@ class MainFrame(wx.Frame):
         if not self.tree.GetItemParent(self.treeItem).IsOk():    
             return 
         else:
-            for i in range(len(treeData) - 1):
-                self.textCtrls[i].SetValue(str(treeData[i+1]))
-            self.textCtrls[-1].SetValue(str(self.getItemTotalValue(self.treeItem)))
+            i = 0
+            while i < len(treeData):
+                if i < 2: 
+                    self.textCtrls[i].SetValue(str(treeData[i+1]))
+                elif i > 2:
+                    self.textCtrls[i-1].SetValue(str(treeData[i]))
+                i += 1
+            #self.textCtrls[-1].SetValue(str(self.getItemTotalValue(self.treeItem)))
     
     def getItemTotalValue(self, treeItem):
         treeData = self.tree.GetItemData(treeItem)
@@ -93,7 +98,7 @@ class MainFrame(wx.Frame):
             rootItem = self.tree.GetRootItem()
             self.tree.CollapseAllChildren(rootItem)
         elif label == '清空业绩':
-            pass 
+            self.deleteAllValues()
         elif label == '突出显示':
             pass 
         elif label == '保存':
@@ -102,9 +107,13 @@ class MainFrame(wx.Frame):
             self.enableEdit()
 
     def enableEdit(self):
-        pass 
+        pass
+        #editableCtrls = self.textCtrls[]
 
     def saveData(self):
+        pass 
+
+    def deleteAllValues(self):
         pass 
 
     def menuHandler(self, e):
@@ -184,21 +193,31 @@ class MainFrame(wx.Frame):
         self.rightBox.Add(btnBox, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL, border=20)
         self.box.Add(self.rightBox, flag=wx.ALL, border=15)
         
-        for i, name in enumerate(self.colNames[1:]):
-            gbs.Add(wx.StaticText(self.panel, label=name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
-            # 不开启编辑，均为只读
-            tc = wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY)
-            self.textCtrls.append(tc)
-            gbs.Add(tc, (i, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)   
+        for i, name in enumerate(self.colNames):
+            if i == 2:
+                continue 
+            elif i < 2:
+                gbs.Add(wx.StaticText(self.panel, label=name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
+                # 不开启编辑，均为只读
+                tc = wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY)
+                self.textCtrls.append(tc)
+                gbs.Add(tc, (i, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)   
+            else:
+                gbs.Add(wx.StaticText(self.panel, label=name), (i-1, 0), flag=wx.ALIGN_CENTER_VERTICAL)
+                # 不开启编辑，均为只读
+                tc = wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY)
+                self.textCtrls.append(tc)
+                gbs.Add(tc, (i-1, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)  
         
         # 总个人业绩永远为只读     
-        gbs.Add(wx.StaticText(self.panel, label='总个人业绩（自动计算）'), (5, 0))
+        gbs.Add(wx.StaticText(self.panel, label='总个人业绩（自动计算）'), (4, 0))
         tc = wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY)
         self.textCtrls.append(tc)
-        gbs.Add(tc, (5, 1), flag=wx.LEFT, border=8)
+        gbs.Add(tc, (4, 1), flag=wx.LEFT, border=8)
         
         btnBox.Add(wx.Button(self.panel, wx.ID_EDIT, '编辑', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
         btnBox.Add(wx.Button(self.panel, wx.ID_SAVE, '保存', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
+        print(len(self.textCtrls))
 
     def initFunctionView(self):
         self.functionBox.Add(wx.Button(self.panel, wx.ID_ANY, '展开全部', size=(80, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
