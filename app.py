@@ -1,5 +1,7 @@
 import wx 
 import sqlite3
+import datetime
+from database import Database
 
 class OurPopupMenu(wx.Menu):
     def __init__(self, *args, **kw):
@@ -12,17 +14,24 @@ class OurPopupMenu(wx.Menu):
 class MainFrame(wx.Frame):
     def __init__(self, parent, title):
         super().__init__(parent, title=title)
-        self.SetSize((700, 300))
+        self.SetSize((700, 400))
         self.textCtrls = [] # 右侧信息列表
-        #self.itemData = []  # 被选中项目的值
-        self.colNames = ['编号', '姓名', '手机号', '上级编号', '个人业绩']
+        self.treeItem = None    # 被选中的item
+        
+        self.table = 'sample_db'
+        self.db = Database()
+        self.db.initDB(self.table, ifTest=True)
+        # 上级会员号不用显示，通过popmenu添加数据时自动设置
+        # self.colNames = ['会员号', '姓名', '上级会员号', '注册日期', '个人业绩']
+        self.colNames = self.db.getColNames(self.table)
+        self.keyName = self.colNames[0]
         
         self.panel = wx.Panel(self)
         self.box = wx.BoxSizer(wx.HORIZONTAL)
         self.functionBox = wx.BoxSizer(wx.HORIZONTAL)
         self.totalBox = wx.BoxSizer(wx.VERTICAL)
         self.totalBox.Add(self.box, flag=wx.EXPAND)
-        self.totalBox.Add(self.functionBox)
+        self.totalBox.Add(self.functionBox, flag=wx.ALIGN_CENTER_HORIZONTAL)
         self.panel.SetSizer(self.totalBox)
 
         self.popupMenu = OurPopupMenu()
@@ -37,6 +46,7 @@ class MainFrame(wx.Frame):
 
         self.Bind(wx.EVT_TREE_SEL_CHANGED, self.treeSelChanged, self.tree)
         self.Bind(wx.EVT_TREE_ITEM_RIGHT_CLICK, self.treeRightClick, self.tree)
+        # btnHandler处理所有button的事件
         self.Bind(wx.EVT_BUTTON, self.btnHandler)
         # TODO:
         #self.Bind(wx.EVT_MENU, self.menuHandler, self.popupMenu)
@@ -44,15 +54,15 @@ class MainFrame(wx.Frame):
         self.Centre()
     
     def treeSelChanged(self, e):
-        treeItem = e.GetItem() 
-        treeData = self.tree.GetItemData(treeItem)
+        self.treeItem = e.GetItem() 
+        treeData = self.tree.GetItemData(self.treeItem)
 
-        if not self.tree.GetItemParent(treeItem).IsOk():    
+        if not self.tree.GetItemParent(self.treeItem).IsOk():    
             return 
         else:
             for i in range(len(treeData) - 1):
                 self.textCtrls[i].SetValue(str(treeData[i+1]))
-            self.textCtrls[-1].SetValue(str(self.getItemTotalValue(treeItem)))
+            self.textCtrls[-1].SetValue(str(self.getItemTotalValue(self.treeItem)))
     
     def getItemTotalValue(self, treeItem):
         treeData = self.tree.GetItemData(treeItem)
@@ -74,6 +84,27 @@ class MainFrame(wx.Frame):
         self.panel.PopupMenu(self.popupMenu)
 
     def btnHandler(self, e):
+        button = e.GetEventObject()
+        label = button.GetLabel()
+        if label == '展开全部':
+            rootItem = self.tree.GetRootItem()
+            self.tree.ExpandAllChildren(rootItem)
+        elif label == '收起全部':
+            rootItem = self.tree.GetRootItem()
+            self.tree.CollapseAllChildren(rootItem)
+        elif label == '清空业绩':
+            pass 
+        elif label == '突出显示':
+            pass 
+        elif label == '保存':
+            self.saveData()
+        elif label == '编辑':
+            self.enableEdit()
+
+    def enableEdit(self):
+        pass 
+
+    def saveData(self):
         pass 
 
     def menuHandler(self, e):
@@ -85,19 +116,11 @@ class MainFrame(wx.Frame):
         else:
             pass 
 
-    def DeleteItem():
+    def DeleteItem(self):
         pass 
 
     def readTreeData(self):
-        treeData = [
-            (0, '所有数据', None, None, None),
-            (1, 'Alice', '12345678', 0, 100),
-            (2, 'Bob', '32132234', 1, 12),
-            (3, 'Lily', 0, 1, 16),
-            (4, 'Lucy', '33298726', 3, 30),
-            (5, 'Bob', '12311245', None, 16)
-        ]
-        self.treeData = treeData
+        self.treeData = self.db.getData(self.table)
 
     def initTreeView(self):
         self.tree = wx.TreeCtrl(self.panel)
@@ -150,12 +173,12 @@ class MainFrame(wx.Frame):
         self.updateTreeLabel()
 
     def initDetailView(self):
-        rightBox = wx.BoxSizer(wx.VERTICAL)
+        self.rightBox = wx.StaticBoxSizer(wx.VERTICAL, self.panel, '详细信息')
         gbs = wx.GridBagSizer(5, 2)
         btnBox = wx.BoxSizer(wx.HORIZONTAL)
-        rightBox.Add(gbs, flag=wx.ALL, border=5)
-        rightBox.Add(btnBox, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL, border=20)
-        self.box.Add(rightBox, flag=wx.ALL, border=10)
+        self.rightBox.Add(gbs, flag=wx.ALL, border=5)
+        self.rightBox.Add(btnBox, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL, border=20)
+        self.box.Add(self.rightBox, flag=wx.ALL, border=15)
         
         for i, name in enumerate(self.colNames[1:]):
             gbs.Add(wx.StaticText(self.panel, label=name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
@@ -174,7 +197,10 @@ class MainFrame(wx.Frame):
         btnBox.Add(wx.Button(self.panel, wx.ID_SAVE, '保存', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
 
     def initFunctionView(self):
-        pass
+        self.functionBox.Add(wx.Button(self.panel, wx.ID_ANY, '展开全部', size=(80, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
+        self.functionBox.Add(wx.Button(self.panel, wx.ID_ANY, '收起全部', size=(80, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
+        self.functionBox.Add(wx.Button(self.panel, wx.ID_ANY, '清空业绩', size=(80, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
+        self.functionBox.Add(wx.Button(self.panel, wx.ID_ANY, '突出显示', size=(80, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
 
 
 def main():
