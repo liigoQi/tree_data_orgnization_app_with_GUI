@@ -142,7 +142,10 @@ class MainFrame(wx.Frame):
                     self.updateTreeLabel()
 
     def deleteAllValues(self):
-        pass 
+        content = {'个人业绩': 0}
+        self.db.updateRows(self.table, content)
+        self.readTreeData()
+        self.reloadTreeView()
 
     def menuHandler(self, e):
         # handler不能传参数，要知道处理的是哪个item必须记录在class的属性里！ TODO:
