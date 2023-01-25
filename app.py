@@ -10,6 +10,59 @@ class OurPopupMenu(wx.Menu):
         self.Append(wx.MenuItem(self, wx.ID_ADD, '增加下级'))
         self.Append(wx.MenuItem(self, wx.ID_DELETE, '删除此项'))
 
+class InputDialog(wx.Dialog):
+    def __init__(self, parent, inputColNames):
+        super().__init__(parent, wx.ID_ANY, '新增项目', size=(300, 260))
+        self.data = None 
+
+        self.panel = wx.Panel(self, wx.ID_ANY)
+        self.inputColNames = inputColNames
+        self.tcs = []
+        
+        self.box = wx.BoxSizer(wx.VERTICAL)
+        gbs = wx.GridBagSizer(5, 2)
+        btnBox = wx.BoxSizer(wx.HORIZONTAL)
+        self.box.Add(gbs, flag=wx.TOP | wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER, border=15)
+        self.box.Add(btnBox, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL, border=10)
+        
+        for i, name in enumerate(self.inputColNames):
+            if name in ['会员号', '姓名']:
+                tmp_name = name + '*'
+            else:
+                tmp_name = name
+            gbs.Add(wx.StaticText(self.panel, label=tmp_name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
+            # 不开启编辑，均为只读
+            tc = wx.TextCtrl(self.panel, size=(150, -1))
+            gbs.Add(tc, (i, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)    
+            self.tcs.append(tc)
+
+        self.saveBtn = wx.Button(self.panel, wx.ID_SAVE, label='保存')
+        self.cancelBtn = wx.Button(self.panel, wx.ID_CANCEL, label='取消')
+        btnBox.Add(self.saveBtn, flag=wx.RIGHT | wx.TOP, border=10)
+        btnBox.Add(self.cancelBtn, flag=wx.LEFT | wx.TOP, border=10)
+
+        self.saveBtn.Bind(wx.EVT_BUTTON, self.popData)
+        self.cancelBtn.Bind(wx.EVT_BUTTON, self.cancel)
+        self.Bind(wx.EVT_CLOSE, self.cancel)
+
+        self.tcs[-1].SetValue('0')
+
+        self.panel.SetSizer(self.box)
+        self.Show()
+
+    def popData(self, e):
+        #content = {self.inputColNames[i]: self.tcs[i].GetValue() for i in range(len(self.inputColNames))}
+        #content['个人业绩'] = int(content['个人业绩'])
+        data = [self.tcs[i].GetValue() for i in range(len(self.tcs))]
+        data[-1] = int(data[-1])
+        self.data = data 
+        self.EndModal(wx.ID_SAVE)
+        self.Destroy()
+
+    def cancel(self, e):
+        self.data = None 
+        self.EndModal(wx.ID_CANCEL)
+        self.Destroy()
 
 class MainFrame(wx.Frame):
     def __init__(self, parent, title):
@@ -159,7 +212,7 @@ class MainFrame(wx.Frame):
             self.addSiblingItem()
 
     def deleteItem(self):
-        dialog = wx.MessageDialog(self.panel, '将删除该项目及其所有子项目，是否确定？', '警告',wx.OK | wx.CANCEL) 
+        dialog = wx.MessageDialog(self.panel, '将删除该项目及其所有子项目，是否确定？', '警告',wx.OK | wx.CANCEL | wx.ICON_EXCLAMATION) 
         res = dialog.ShowModal()
         if res == wx.ID_OK:
             data = self.tree.GetItemData(self.treeItem)
@@ -173,18 +226,35 @@ class MainFrame(wx.Frame):
             self.reloadTreeView()
 
     def addChildItem(self):
-        # TODO:
-        rows = [()]
+        curData = self.tree.GetItemData(self.treeItem)
+        key = curData[0]
+        dialog = InputDialog(self.panel, self.colNames)
+        # 自动填充上级会员号
+        dialog.tcs[2].SetValue(key)
+        dialog.tcs[2].SetEditable(False)
+        dialog.ShowModal()
+        newData = dialog.data
+        rows = [tuple(newData)]
         self.db.insertRows(self.table, rows)
         self.readTreeData()
         self.reloadTreeView()
-
+        print(newData[0])
+        self.selectItemWithKey(newData[0])
+        
     def addSiblingItem(self):
-        # TODO:
-        rows = [()]
+        curData = self.tree.GetItemData(self.treeItem)
+        parent = curData[2]
+        dialog = InputDialog(self.panel, self.colNames)
+        # 自动填充上级会员号
+        dialog.tcs[2].SetValue(parent)
+        dialog.tcs[2].SetEditable(False)
+        dialog.ShowModal()
+        newData = dialog.data
+        rows = [tuple(newData)]
         self.db.insertRows(self.table, rows)
         self.readTreeData()
         self.reloadTreeView()
+        self.selectItemWithKey(newData[0])
 
     def readTreeData(self):
         self.treeData = self.db.getData(self.table)
@@ -235,6 +305,28 @@ class MainFrame(wx.Frame):
             while childItem.IsOk():
                 updateSubtreeLabel(childItem)
                 childItem, cookie = self.tree.GetNextChild(childItem, cookie)
+
+    def selectItemWithKey(self, key):
+        
+        def findItemWithKey(parent, key):
+            parentItemData = self.tree.GetItemData(parent)
+            parentId = parentItemData[0]
+            if parentId == key:
+                return parent
+            else:
+                if self.tree.ItemHasChildren(parent):
+                    childItem, cookie = self.tree.GetFirstChild(parent)
+                    while childItem.IsOk():
+                        item = findItemWithKey(childItem, key)
+                        if item != None:
+                            return item 
+                        childItem, cookie = self.tree.GetNextChild(parent, cookie)
+            return None 
+        
+        item = findItemWithKey(self.tree.RootItem, key)
+        if item:
+            self.treeItem = item 
+            self.tree.SelectItem(item)
 
     def reloadTreeView(self):
         self.tree.DeleteAllItems()  # 清空树
