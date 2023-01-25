@@ -49,7 +49,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_TREE_ITEM_RIGHT_CLICK, self.treeRightClick, self.tree)
         # btnHandler处理所有button的事件
         self.Bind(wx.EVT_BUTTON, self.btnHandler)
-        # TODO:
+        # menuHandler处理所有menu的事件
         self.Bind(wx.EVT_MENU, self.menuHandler)
 
         self.Centre()
@@ -148,24 +148,41 @@ class MainFrame(wx.Frame):
         self.reloadTreeView()
 
     def menuHandler(self, e):
-        # handler不能传参数，要知道处理的是哪个item必须记录在class的属性里！ TODO:
+        # handler不能传参数，要知道处理的是哪个item必须记录在class的属性里！
         # 这些修改都应该是直接对数据库做的，修改后再更新treeView即可
         eid = e.GetId()
         if eid == wx.ID_DELETE:
-            self.DeleteItem() 
+            self.deleteItem() 
         elif eid == wx.ID_ADD:  # 增加下级
-            pass
+            self.addChildItem()
         elif eid == wx.ID_NEW:  # 增加同级
-            pass 
+            self.addSiblingItem()
 
-    def DeleteItem(self):
-        data = self.tree.GetItemData(self.treeItem)
-        key = data[0]
-        # 删除自己
-        cond1 = f'会员号=\'{key}\''
-        self.db.deleteRows(self.table, cond1)
-        # 删除它的孩子
-        cond2 = f'上级会员号=\'{key}\''
+    def deleteItem(self):
+        dialog = wx.MessageDialog(self.panel, '将删除该项目及其所有子项目，是否确定？', '警告',wx.OK | wx.CANCEL) 
+        res = dialog.ShowModal()
+        if res == wx.ID_OK:
+            data = self.tree.GetItemData(self.treeItem)
+            key = data[0]
+            # 删除自己
+            cond1 = f'会员号=\'{key}\''
+            self.db.deleteRows(self.table, cond1)
+            # 删除它的孩子
+            cond2 = f'上级会员号=\'{key}\''
+            self.readTreeData()
+            self.reloadTreeView()
+
+    def addChildItem(self):
+        # TODO:
+        rows = [()]
+        self.db.insertRows(self.table, rows)
+        self.readTreeData()
+        self.reloadTreeView()
+
+    def addSiblingItem(self):
+        # TODO:
+        rows = [()]
+        self.db.insertRows(self.table, rows)
         self.readTreeData()
         self.reloadTreeView()
 
@@ -257,7 +274,6 @@ class MainFrame(wx.Frame):
         self.functionBox.Add(wx.Button(self.panel, wx.ID_ANY, '收起全部', size=(80, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
         self.functionBox.Add(wx.Button(self.panel, wx.ID_ANY, '清空业绩', size=(80, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
         self.functionBox.Add(wx.Button(self.panel, wx.ID_ANY, '突出显示', size=(80, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
-
 
 def main():
     app = wx.App()
