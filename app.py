@@ -48,6 +48,7 @@ class InputDialog(wx.Dialog):
         self.tcs[-1].SetValue('0')
 
         self.panel.SetSizer(self.box)
+        self.CentreOnParent()
         self.Show()
 
     def popData(self, e):
@@ -129,7 +130,6 @@ class MainFrame(wx.Frame):
         if self.tree.ItemHasChildren(treeItem):
             childItem, cookie = self.tree.GetFirstChild(treeItem)
             while childItem.IsOk():
-                #print(self.getItemTotalValue(childItem))
                 totalValue += self.getItemTotalValue(childItem)
                 childItem, cookie = self.tree.GetNextChild(treeItem, cookie)
             return totalValue
@@ -238,7 +238,6 @@ class MainFrame(wx.Frame):
         self.db.insertRows(self.table, rows)
         self.readTreeData()
         self.reloadTreeView()
-        print(newData[0])
         self.selectItemWithKey(newData[0])
         
     def addSiblingItem(self):
@@ -273,7 +272,7 @@ class MainFrame(wx.Frame):
             return 
     
     def initTreeView(self):
-        self.tree = wx.TreeCtrl(self.panel)
+        self.tree = wx.TreeCtrl(self.panel, style=wx.VSCROLL | wx.HSCROLL)
         #self.tree.SetQuickBestSize(False)
         rootItem = self.tree.AddRoot('所有数据', data=self.treeData[0])
         self.makeTree(rootItem)
