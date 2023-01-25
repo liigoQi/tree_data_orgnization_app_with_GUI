@@ -50,7 +50,7 @@ class MainFrame(wx.Frame):
         # btnHandler处理所有button的事件
         self.Bind(wx.EVT_BUTTON, self.btnHandler)
         # TODO:
-        #self.Bind(wx.EVT_MENU, self.menuHandler, self.popupMenu)
+        self.Bind(wx.EVT_MENU, self.menuHandler)
 
         self.Centre()
     
@@ -159,7 +159,15 @@ class MainFrame(wx.Frame):
             pass 
 
     def DeleteItem(self):
-        pass 
+        data = self.tree.GetItemData(self.treeItem)
+        key = data[0]
+        # 删除自己
+        cond1 = f'会员号=\'{key}\''
+        self.db.deleteRows(self.table, cond1)
+        # 删除它的孩子
+        cond2 = f'上级会员号=\'{key}\''
+        self.readTreeData()
+        self.reloadTreeView()
 
     def readTreeData(self):
         self.treeData = self.db.getData(self.table)
