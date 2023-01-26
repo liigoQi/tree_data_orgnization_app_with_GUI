@@ -1,4 +1,5 @@
 import wx 
+import wx.adv
 import sqlite3
 import datetime
 from database import Database
@@ -31,8 +32,10 @@ class InputDialog(wx.Dialog):
             else:
                 tmp_name = name
             gbs.Add(wx.StaticText(self.panel, label=tmp_name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
-            # 不开启编辑，均为只读
-            tc = wx.TextCtrl(self.panel, size=(150, -1))
+            if i == 3:
+                tc = wx.adv.DatePickerCtrl(self.panel, size=(150, -1))
+            else:
+                tc = wx.TextCtrl(self.panel, size=(150, -1))
             gbs.Add(tc, (i, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)    
             self.tcs.append(tc)
 
@@ -56,14 +59,18 @@ class InputDialog(wx.Dialog):
         #content['个人业绩'] = int(content['个人业绩'])
         data = [self.tcs[i].GetValue() for i in range(len(self.tcs))]
         data[-1] = int(data[-1])
+        # wx.DateTime转为字符串
+        data[3] = data[3].Format('%y-%m-%d')
         self.data = data 
         self.EndModal(wx.ID_SAVE)
         self.Destroy()
+        return wx.ID_OK
 
     def cancel(self, e):
         self.data = None 
         self.EndModal(wx.ID_CANCEL)
         self.Destroy()
+        return wx.ID_CANCEL
 
 class MainFrame(wx.Frame):
     def __init__(self, parent, title):
@@ -85,7 +92,7 @@ class MainFrame(wx.Frame):
         self.box = wx.BoxSizer(wx.HORIZONTAL)
         self.functionBox = wx.BoxSizer(wx.HORIZONTAL)
         self.totalBox = wx.BoxSizer(wx.VERTICAL)
-        self.totalBox.Add(self.box, flag=wx.EXPAND)
+        self.totalBox.Add(self.box, flag=wx.ALL | wx.EXPAND, border=5)
         self.totalBox.Add(self.functionBox, flag=wx.ALIGN_CENTER_HORIZONTAL)
         self.panel.SetSizer(self.totalBox)
 
@@ -111,7 +118,7 @@ class MainFrame(wx.Frame):
     def updateDetailView(self):
         treeData = self.tree.GetItemData(self.treeItem)
         for i in range(len(treeData)):
-                self.textCtrls[i].SetValue(str(treeData[i]))
+            self.textCtrls[i].SetValue(str(treeData[i]))
         self.textCtrls[-1].SetValue(str(self.getItemTotalValue(self.treeItem)))
 
     # 根据self.tree上item的data决定右侧显示的内容
@@ -164,11 +171,23 @@ class MainFrame(wx.Frame):
         editableCtrls = self.textCtrls[:-1]
         for tc in editableCtrls:
             tc.SetEditable(True)
+        self.gbs.Detach(self.textCtrls[3])
+        self.textCtrls[3].Hide()
+        self.gbs.Add(self.datePicker, (3, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)
+        data = self.tree.GetItemData(self.treeItem)
+        date = wx.DateTime()
+        date.ParseFormat(data[3], '%Y-%m-%d')
+        #print(date)
+        self.datePicker.SetValue(date)
+        self.datePicker.Show()
+        self.gbs.Layout()
 
     def saveData(self):
         oldData = self.tree.GetItemData(self.treeItem)
         newData = [_.GetValue() for _ in self.textCtrls[:-1]]
         newData[-1] = int(newData[-1])
+        newData[3] = self.datePicker.GetValue().Format('%Y-%m-%d')
+        #print(newData[3])
         content = dict()
         for i in range(len(newData)):
             content[self.colNames[i]] = newData[i]
@@ -193,6 +212,12 @@ class MainFrame(wx.Frame):
                     self.tree.SetItemData(self.treeItem, data=newData)
                     self.updateDetailView()
                     self.updateTreeLabel()
+            
+            self.gbs.Detach(self.datePicker)
+            self.datePicker.Hide()
+            self.gbs.Add(self.textCtrls[3], (3, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)
+            self.textCtrls[3].Show()
+            self.gbs.Layout()
 
     def deleteAllValues(self):
         content = {'个人业绩': 0}
@@ -232,13 +257,15 @@ class MainFrame(wx.Frame):
         # 自动填充上级会员号
         dialog.tcs[2].SetValue(key)
         dialog.tcs[2].SetEditable(False)
-        dialog.ShowModal()
-        newData = dialog.data
-        rows = [tuple(newData)]
-        self.db.insertRows(self.table, rows)
-        self.readTreeData()
-        self.reloadTreeView()
-        self.selectItemWithKey(newData[0])
+        dialog.tcs[3].SetValue(wx.DateTime.Today())
+        res = dialog.ShowModal()
+        if res == wx.ID_OK:
+            newData = dialog.data
+            rows = [tuple(newData)]
+            self.db.insertRows(self.table, rows)
+            self.readTreeData()
+            self.reloadTreeView()
+            self.selectItemWithKey(newData[0])
         
     def addSiblingItem(self):
         curData = self.tree.GetItemData(self.treeItem)
@@ -247,13 +274,15 @@ class MainFrame(wx.Frame):
         # 自动填充上级会员号
         dialog.tcs[2].SetValue(parent)
         dialog.tcs[2].SetEditable(False)
-        dialog.ShowModal()
-        newData = dialog.data
-        rows = [tuple(newData)]
-        self.db.insertRows(self.table, rows)
-        self.readTreeData()
-        self.reloadTreeView()
-        self.selectItemWithKey(newData[0])
+        dialog.tcs[3].SetValue(wx.DateTime.Today())
+        res = dialog.ShowModal()
+        if res == wx.ID_OK:
+            newData = dialog.data
+            rows = [tuple(newData)]
+            self.db.insertRows(self.table, rows)
+            self.readTreeData()
+            self.reloadTreeView()
+            self.selectItemWithKey(newData[0])
 
     def readTreeData(self):
         self.treeData = self.db.getData(self.table)
@@ -337,24 +366,27 @@ class MainFrame(wx.Frame):
 
     def initDetailView(self):
         self.rightBox = wx.StaticBoxSizer(wx.VERTICAL, self.panel, '详细信息')
-        gbs = wx.GridBagSizer(5, 2)
+        self.gbs = wx.GridBagSizer(5, 2)
         btnBox = wx.BoxSizer(wx.HORIZONTAL)
-        self.rightBox.Add(gbs, flag=wx.ALL, border=5)
+        self.rightBox.Add(self.gbs, flag=wx.ALL | wx.EXPAND, border=5)
         self.rightBox.Add(btnBox, flag=wx.ALL | wx.ALIGN_CENTER_HORIZONTAL, border=20)
-        self.box.Add(self.rightBox, flag=wx.ALL, border=15)
+        self.box.Add(self.rightBox, flag=wx.ALL | wx.EXPAND, border=15)
         
         for i, name in enumerate(self.colNames):
-            gbs.Add(wx.StaticText(self.panel, label=name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
+            self.gbs.Add(wx.StaticText(self.panel, label=name), (i, 0), flag=wx.ALIGN_CENTER_VERTICAL)
             # 不开启编辑，均为只读
             tc = wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY)
             self.textCtrls.append(tc)
-            gbs.Add(tc, (i, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)    
+            self.gbs.Add(tc, (i, 1), flag=wx.LEFT | wx.ALIGN_CENTER_VERTICAL, border=8)    
         
         # 总个人业绩永远为只读     
-        gbs.Add(wx.StaticText(self.panel, label='总个人业绩（自动计算）'), (len(self.colNames), 0))
+        self.gbs.Add(wx.StaticText(self.panel, label='总个人业绩（自动计算）'), (len(self.colNames), 0))
         tc = wx.TextCtrl(self.panel, size=(150, -1), style=wx.TE_READONLY)
         self.textCtrls.append(tc)
-        gbs.Add(tc, (len(self.colNames), 1), flag=wx.LEFT, border=8)
+        self.gbs.Add(tc, (len(self.colNames), 1), flag=wx.LEFT, border=8)
+        
+        self.datePicker = wx.adv.DatePickerCtrl(self.panel, size=(150, -1))
+        self.datePicker.Hide()
         
         btnBox.Add(wx.Button(self.panel, wx.ID_EDIT, '编辑', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
         btnBox.Add(wx.Button(self.panel, wx.ID_SAVE, '保存', size=(60, 30)), flag=wx.LEFT | wx.RIGHT, border=10)
